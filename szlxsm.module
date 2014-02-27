@@ -1,0 +1,202 @@
+<?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL ^ E_NOTICE);
+module_load_include('inc', 'photos', 'inc/photos.data');
+module_load_include('module', 'photos', 'photos.module');
+ 
+
+function szlxsm_menu() {
+  $items = array();
+  $items['anlie/%'] = array(
+      'title' => 'anlie',
+      'page callback' => 'szlxsm_anlie',
+      'page arguments' => array('szlxsm anlie list'),
+
+      'access arguments' => array('access szlxsm list'),
+      'type' => MENU_NORMAL_ITEM,
+      'weight' => 10,
+      'file' => 'anlie.inc',
+  );
+
+  $items['workroom/%'] = array(
+      'title' => 'workroom',
+      'page callback' => 'szlxsm_workroom',
+      'page arguments' => array('szlxsm anlie list'),
+  
+      'access arguments' => array('access szlxsm list'),
+      'type' => MENU_NORMAL_ITEM,
+      'weight' => 10,
+      'file' => 'anlie.inc',
+  );
+  
+
+
+  $items['dongtai/%'] = array(
+      'title' => 'dongtai',
+      'page callback' => 'szlxsm_dongtai',
+      'page arguments' => array('szlxsm anlie list'),
+  
+      'access arguments' => array('access szlxsm list'),
+      'type' => MENU_NORMAL_ITEM,
+      'weight' => 10,
+      'file' => 'anlie.inc',
+  );
+  
+  
+  
+  return $items;
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function szlxsm_permission(){
+  return array(
+      'access szlxsm list' => array(
+          'title' => t('access szlxsm list'),
+      )
+  );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function szlxsm_theme($existing, $type, $theme, $path) {
+
+  return array(
+
+      'anlie_list' => array(
+          'variables' => array('anlie_list'=>array()),
+          'template' => 'templates/anlie-list',
+          'render element' => 'elements',
+          'path' => drupal_get_path('module', 'szlxsm')
+      ),
+  
+      'workroom_list' => array(
+          'variables' => array('workroom_list'=>array()),
+          'template' => 'templates/workroom-list',
+          'render element' => 'elements',
+          'path' => drupal_get_path('module', 'szlxsm')
+      ),
+
+      'dongtai_list' => array(
+          'variables' => array('dongtai_list'=>array()),
+          'template' => 'templates/dongtai-list',
+          'render element' => 'elements',
+          'path' => drupal_get_path('module', 'szlxsm')
+      ),
+      
+       'user_login'=>array(
+          'render element' => 'form',
+          'template' => 'templates/user-login', 
+        ),
+      
+      
+      
+  );
+
+}
+
+function szlxsm_form_alter(&$form, $form_state, $form_id){
+  if($form_id=='photos_node_form'){
+     $form['photos']['#collapsed'] = 'true';
+     $form['photos']["#weight"] = 10;
+     $form['photos_share']['#collapsed'] = 'true';
+     $form['photos_share']["#weight"] = 10;
+     unset($form['actions']["preview"]); 
+  }elseif ($form_id=='article_node_form'){
+     $form['photos_share']['#collapsed'] = 'true';
+     unset($form['actions']["preview"]);
+  }elseif ($form_id=='page_node_form'){
+    $form['photos_share']['#collapsed'] = 'true';
+    unset($form['actions']["preview"]);
+  }elseif ($form_id=='contact_site_form'){
+     
+    $form['message']['#title'] = "反馈信息";
+    $form['message']['#rows'] = 3;
+     
+  }
+}
+
+ 
+
+
+ 
+function szlxsm_block_info() {
+  $blocks['new_anlie_top'] = array(
+      'info' => "最新案例",
+  );
+  
+  $blocks['lxsm_bottom_nav'] = array(
+      'info' => "底部导航",
+  );
+  
+  return $blocks;
+}
+
+
+/**
+ * Implementation of hook_block_view().
+ */
+function szlxsm_block_view($delta='') {
+  $block = array();
+  switch ($delta) {
+    case 'new_anlie_top':
+      $block['subject'] = "最新案例";
+      $block['content'] = new_anlie_top();
+      break; 
+  }
+  return $block;
+}
+
+ 
+ 
+
+
+/**
+ * custom html block
+ * @return string
+ */
+function new_anlie_top() {
+  $query = db_select('node', 'n')
+          ->extend('PagerDefault');
+          $query->join('photos_album', 'p', 'p.pid = n.nid');
+          $query->fields('n', array('nid')); 
+          $query->fields('p', array('fid')); 
+          $query->orderBy('p.wid', 'ASC');
+          $query->orderBy('n.nid', 'DESC');
+          $query->limit(8);
+          $objects = $query->execute()->fetchAll();  
+    $str = "";
+    $i=1;
+    foreach ($objects as $key=>$object) {
+      $image = photos_get_info($object->fid,$object);
+      $node = node_load($object->nid);
+      $data = array(
+          "title"=>$node->title,
+          "nid"=>$object->nid,
+          "fid"=>$object->fid,
+          "body"=>drupal_substr(strip_tags($node->body['und']['0']['value']),0,130),
+          "img"=>isset($image->uri)? $image->uri: "public://photos/nocover.jpg"
+      );
+       
+      $pic = l(theme_image_style(array('path' => $data['img'],
+				 'style_name' => 'thumbnail','alt'=>$node->title,'title'=>$node->title)), 'workroom/' . $data['nid'], array('html' => TRUE));
+      $alink = l($data['title'], 'workroom/' . $data['nid']);
+      $info = $data['body'];
+      ($i%2==0)?$class="class='even'":$class="class='odd'";
+      $str .= '<li '.$class.'>'.$pic.'</li>';
+      $i++;
+    }
+    return $str; 
+}
+
+ 
+
+
+
+
+
+
+
